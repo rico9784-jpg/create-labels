@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>標籤檢核 V7.4 穩定版（7項）</title>
+<title>製標審標版｜成分顯示修正版</title>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <style>
 body{margin:0;font-family:Arial,sans-serif;background:#0f172a;color:#fff}
@@ -27,21 +27,32 @@ th,td{border-bottom:1px solid #334155;padding:8px;text-align:left;vertical-align
 th{background:#1f2937}
 .mono{font-family:Consolas,monospace}
 .small{font-size:12px;color:#cbd5e1;line-height:1.7}
-.badge{display:inline-block;background:#334155;color:#fff;padding:2px 8px;border-radius:999px;font-size:12px}
+.badge{display:inline-block;background:#334155;color:#fff;padding:2px 8px;border-radius:999px;font-size:12px}.diff-old{background:#7f1d1d;color:#fecaca;padding:1px 2px;border-radius:4px}.diff-new{background:#14532d;color:#bbf7d0;padding:1px 2px;border-radius:4px}.diff-same{color:#cbd5e1}
 </style>
 </head>
 <body>
 <div class="wrap">
-  <h2>📋 標籤檢核 V7.4（穩定版，7項）</h2>
+  <h2>📋 製標審標版（Google Lens 文字完全比對）</h2>
 
   <div class="panel">
     <div class="small">
       使用方式：<br>
-      1. 第一次先載入 Excel 主檔（工作頁：商品資料），之後程式會自動記住。<br>
+      1. 載入 Excel 主檔（工作頁：商品資料）。<br>
       2. 選類別、品名、配別。<br>
       3. 用 Google Lens / iPhone 掃描文字，複製後貼到下方。<br>
       4. 條碼另外輸入或貼上掃描結果。<br>
-      5. 按「開始比對」，系統會比對：品名、條碼、熱量、售價、製造日期、有效日期、有效時間。<br>
+      5. 按「開始比對」，系統會以你上傳的 Excel 主檔【商品資料】做完全相同文字比對。<br>
+      6. 比對欄位：品名、條碼、熱量、售價、一配有效天數、一配有效時間、二配有效天數、二配有效時間、微波數字、Qrcode、微波時間、過敏原、成分、警語。<br>
+      7. 比對完成後可匯出 CSV，做為審標證據留存。<br>
+      8. 成分欄位改為標準化後完全比對：先去除換行、多餘空白，並統一常見全半形符號後再比對。<br>
+      9. 成分改為獨立貼上，比對更穩。<br>
+      10. 成分貼上區會顯示字數統計。<br>
+      11. 若成分比對失敗，會用顏色標註差異，方便找出問題位置。<br>
+      12. 品名與過敏原比對時，標點符號差異不列為失敗。<br>
+      13. 成分比對時，所有常見標點與符號差異都不列為失敗。<br>
+      14. 成分比對時，分段 / 換行差異也不列入。<br>
+      15. 新增 Qrcode 獨立判讀機制：可單獨貼上 Qrcode 掃描結果，優先以獨立輸入內容比對。<br>
+      16. 微波時間(M) 比對時，忽略 W 大小寫、空白、以及冒號全形 / 半形差異。
     </div>
   </div>
 
@@ -52,7 +63,7 @@ th{background:#1f2937}
     </div>
     <div>
       <label>主檔狀態</label>
-      <div><span id="excelStatus" class="badge">未載入</span></div><div class="small" id="excelInfo"></div>
+      <div><span id="excelStatus" class="badge">未載入</span></div>
     </div>
     <div>
       <label>目前列資料</label>
@@ -83,19 +94,29 @@ th{background:#1f2937}
       <label for="barcodeInput">條碼輸入</label>
       <input id="barcodeInput" type="text" placeholder="貼上掃描到的 13 碼條碼">
     </div>
-    <div style="grid-column:span 2;">
-      <label for="lensText">Google Lens / iPhone 掃描文字貼上區</label>
-      <textarea id="lensText" placeholder="請把掃描到的標籤文字貼在這裡"></textarea>
+    <div>
+      <label for="qrInput">Qrcode 獨立輸入</label>
+      <input id="qrInput" type="text" placeholder="貼上 Qrcode 掃描結果">
+    </div>
+    <div>
+      <label for="lensText">Google Lens / iPhone 掃描文字貼上區（成分以外）</label>
+      <textarea id="lensText" placeholder="請把掃描到的標籤文字貼在這裡（不含成分）"></textarea>
+    </div>
+  </div>
+
+  <div class="row" style="margin-top:10px">
+    <div style="grid-column:span 3;">
+      <label for="ingredientText">成分獨立貼上區</label>
+      <textarea id="ingredientText" placeholder="請把成分文字單獨貼在這裡"></textarea>
+      <div class="small" id="ingredientCount">字數：0</div>
     </div>
   </div>
 
   <div class="panel">
     <button id="btnCompare">開始比對</button>
+    <button id="btnExportCsv" class="ghost">匯出CSV</button>
     <button id="btnDemo" class="ghost">載入示範文字</button>
-    <button id="btnClearText" class="ghost">清除貼上文字</button>
-    <button id="btnSaveResult" class="ghost">儲存結果</button>
-    <button id="btnExportCsv" class="ghost">匯出 CSV</button>
-    <button id="btnClearMaster" class="ghost">清除主檔快取</button>
+    <button id="btnClearText" class="ghost">清空貼上文字</button>
   </div>
 
   <div id="status" class="status warn">請先載入 Excel 主檔。</div>
@@ -117,14 +138,23 @@ th{background:#1f2937}
     <div><b>解析明細</b></div>
     <div id="parseDetail" class="mono small"></div>
   </div>
+
+  <div class="panel">
+    <div><b>匯出預覽</b></div>
+    <div id="exportPreview" class="small">尚未產生可匯出結果</div>
+  </div>
+
+  <div class="panel">
+    <div><b>成分差異顯示（忽略分段）</b></div>
+    <div id="ingredientDiff" class="mono small">尚未比對成分</div>
+  </div>
 </div>
 
 <script>
+
 let masterRows = [];
-const RESULT_STORAGE_KEY = "label_check_v74_results";
-const MASTER_STORAGE_KEY = "label_check_v8_master_rows";
-const MASTER_INFO_KEY = "label_check_v8_master_info";
-let lastResult = null;
+let lastCompareRows = [];
+let lastExportRecord = null;
 
 function qs(id){ return document.getElementById(id); }
 
@@ -134,13 +164,12 @@ function init(){
   qs("product").addEventListener("change", renderExpected);
   qs("delivery").addEventListener("change", renderExpected);
   qs("btnCompare").addEventListener("click", compareText);
+  qs("btnExportCsv").addEventListener("click", exportCsvEvidence);
   qs("btnDemo").addEventListener("click", loadDemo);
-  qs("btnClearText").addEventListener("click", clearLensText);
-  qs("btnSaveResult").addEventListener("click", saveResult);
-  qs("btnExportCsv").addEventListener("click", exportCsv);
-  qs("btnClearMaster").addEventListener("click", clearMasterCache);
-  loadHistory();
-  loadCachedMaster();
+  qs("btnClearText").addEventListener("click", ()=>{ qs("lensText").value=""; qs("ingredientText").value=""; qs("qrInput").value=""; updateIngredientCount(); setStatus("已清空貼上文字、成分文字與 Qrcode。","ok"); });
+  qs("ingredientText").addEventListener("input", updateIngredientCount);
+  updateIngredientCount();
+  renderExportPreview();
 }
 
 async function loadExcel(e){
@@ -158,23 +187,30 @@ async function loadExcel(e){
     masterRows = [];
     for(let i=1;i<rows.length;i++){
       const r = rows[i] || [];
-      const category = clean(r[0]);    // A
-      const product = clean(r[2]);     // C
-      const barcodeBase = clean(r[3]); // D
-      const kcal = normalizeKcal(clean(r[4])); // E
-      const price = normalizePrice(clean(r[5])); // F
-      const oneDays = clean(r[6]);     // G
-      const oneTime = clean(r[7]);     // H
-      const twoDays = clean(r[8]);     // I
-      const twoTime = clean(r[9]);     // J
+      const category = clean(r[0]);     // A
+      const product = clean(r[2]);      // C
+      const barcodeBase = clean(r[3]);  // D
+      const kcal = clean(r[4]);         // E
+      const price = clean(r[5]);        // F
+      const oneDays = clean(r[6]);      // G
+      const oneTime = clean(r[7]);      // H
+      const twoDays = clean(r[8]);      // I
+      const twoTime = clean(r[9]);      // J
+      const microwaveNo = clean(r[10]); // K
+      const qrCode = clean(r[11]);      // L
+      const microwaveTime = clean(r[12]); // M
+      const allergen = clean(r[13]);    // N
+      const ingredient = clean(r[14]);  // O
+      const warning = clean(r[15]);     // P
       if(!category || !product) continue;
       masterRows.push({
-        category, product, barcodeBase, kcal, price, oneDays, oneTime, twoDays, twoTime,
-        nameKeywords: buildNameKeywords(product)
+        category, product, barcodeBase, kcal, price,
+        oneDays, oneTime, twoDays, twoTime,
+        microwaveNo, qrCode, microwaveTime,
+        allergen, ingredient, warning
       });
     }
     populateCategories();
-    saveMasterCache(file.name);
     qs("excelStatus").innerText = "已載入";
     setStatus(`Excel 已載入，共 ${masterRows.length} 筆商品。`, "ok");
   }catch(err){
@@ -182,85 +218,186 @@ async function loadExcel(e){
     setStatus("Excel 讀取失敗。", "ng");
   }
 }
+
 function clean(v){
   if(v === undefined || v === null) return "";
-  return String(v).replace(/\n/g," ").trim();
+  return String(v).replace(/\r/g,"").trim();
 }
-function normalizePrice(v){
-  const digits = String(v||"").replace(/[^\d]/g,"");
-  return digits ? digits + "元" : "";
+function norm(v){
+  return clean(v).replace(/\s+/g,"");
 }
-function normalizeKcal(v){
-  const digits = String(v||"").replace(/[^\d]/g,"");
-  return digits ? digits + "kcal" : "";
+function normLoose(v){
+  return clean(v)
+    .replace(/\s+/g,"")
+    .replace(/[，,、。．.；;：:！!？?（）()［］\[\]【】｛｝{}／/＋+\-＿_「」『』《》〈〉'"`~]/g,"")
+    .toLowerCase();
 }
-function buildNameKeywords(product){
-  const raw = product.replace(/[()（）\-]/g," ");
-  const keys = [];
-  const seeds = ["飯糰","圓","鮪魚","肉鬆","台式","雞肉飯","雙蔬","鮭魚","明太子","林聰明","御選"];
-  for(const s of seeds){
-    if(raw.includes(s)) keys.push(s);
+function exactLooseMatchInText(text, expected){
+  const exp = clean(expected);
+  if(!exp || exp === "X"){
+    return {actual:"(主檔空白/略過)", ok:true, skip:true};
   }
-  if(!keys.length){
-    keys.push(product.slice(0,2), product.slice(-2));
+  const lines = lineList(text);
+  for(const line of lines){
+    if(normLoose(line) === normLoose(exp)) return {actual:line, ok:true};
   }
-  return [...new Set(keys)].filter(Boolean);
+  if(normLoose(text).includes(normLoose(exp))) return {actual:exp, ok:true};
+  for(const line of lines){
+    if(normLoose(line).includes(normLoose(exp)) || normLoose(exp).includes(normLoose(line))){
+      return {actual:line, ok:true};
+    }
+  }
+  return {actual:"", ok:false};
+}
+function normMicrowave(v){
+  return clean(v)
+    .normalize("NFKC")
+    .replace(/\s+/g,"")
+    .replace(/：/g,":")
+    .replace(/ｗ/gi,"W")
+    .replace(/w/gi,"W")
+    .toUpperCase();
+}
+function exactMicrowaveMatchInText(text, expected){
+  const exp = clean(expected);
+  if(!exp || exp === "X"){
+    return {actual:"(主檔空白/略過)", ok:true, skip:true};
+  }
+  const lines = lineList(text);
+  for(const line of lines){
+    if(normMicrowave(line) === normMicrowave(exp)) return {actual:line, ok:true};
+  }
+  if(normMicrowave(text).includes(normMicrowave(exp))) return {actual:exp, ok:true};
+  for(const line of lines){
+    if(normMicrowave(line).includes(normMicrowave(exp)) || normMicrowave(exp).includes(normMicrowave(line))){
+      return {actual:line, ok:true};
+    }
+  }
+  return {actual:"", ok:false};
+}
+function normalizeIngredientText(v){
+  return String(v||"")
+    .normalize("NFKC")
+    .replace(/\r/g,"")
+    .replace(/\n+/g,"")
+    .replace(/\s+/g,"")
+    // 成分欄位：忽略所有常見標點與符號差異
+    .replace(/[，,、。．.；;：:！!？?（）()\[\]【】｛｝{}／/＋+\-＿_%％&＆#＃*＊~～'"`「」『』《》〈〉…‧・﹒﹑｜|]/g,"")
+    .trim();
+}
+function exactIngredientMatchInText(text, expected){
+  const exp = clean(expected);
+  const actualText = clean(text);
+  if(!exp || exp === "X"){
+    return {actual:"(主檔空白/略過)", ok:true, skip:true};
+  }
+  if(!actualText){
+    return {actual:"", ok:false};
+  }
+  const normExp = normalizeIngredientText(exp);
+  const fullNorm = normalizeIngredientText(actualText);
+  if(fullNorm.includes(normExp) || normExp.includes(fullNorm)){
+    return {actual:actualText, ok:true};
+  }
+
+  const lines = lineList(actualText);
+  let joined = "";
+  for(const line of lines){
+    joined += clean(line);
+    if(normalizeIngredientText(joined).includes(normExp) || normExp.includes(normalizeIngredientText(joined))){
+      return {actual:joined, ok:true};
+    }
+  }
+  // 不一致時，也要把貼上的成分內容帶回去，避免畫面只顯示「未找到」
+  return {actual:actualText, ok:false};
 }
 
-function saveMasterCache(fileName){
-  try{
-    localStorage.setItem(MASTER_STORAGE_KEY, JSON.stringify(masterRows));
-    localStorage.setItem(MASTER_INFO_KEY, JSON.stringify({
-      fileName: fileName || "未命名主檔",
-      savedAt: new Date().toLocaleString(),
-      count: masterRows.length
-    }));
-    renderMasterInfo();
-  }catch(e){
-    console.error(e);
+function ingredientDiffText(expected, text){
+  const exp = normalizeIngredientText(expected);
+  const actFull = normalizeIngredientText(text);
+  if(!exp) return "主檔成分空白，略過。";
+  if(!actFull) return "貼上文字中沒有可用的成分內容。";
+
+  if(actFull.includes(exp)) return "成分標準化後比對一致。";
+
+  let start = 0;
+  const minLen = Math.min(exp.length, actFull.length);
+  while(start < minLen && exp[start] === actFull[start]) start++;
+
+  let endExp = exp.length - 1;
+  let endAct = actFull.length - 1;
+  while(endExp >= start && endAct >= start && exp[endExp] === actFull[endAct]){
+    endExp--;
+    endAct--;
   }
+
+  const expDiff = exp.slice(start, endExp + 1);
+  const actDiff = actFull.slice(start, endAct + 1);
+
+  const expContextL = exp.slice(Math.max(0, start - 20), start);
+  const expContextR = exp.slice(endExp + 1, Math.min(exp.length, endExp + 21));
+  const actContextL = actFull.slice(Math.max(0, start - 20), start);
+  const actContextR = actFull.slice(endAct + 1, Math.min(actFull.length, endAct + 21));
+
+  return [
+    "成分比對失敗，第一段差異如下：",
+    "【主檔前文】" + expContextL,
+    "【主檔差異】" + (expDiff || "(無，可能為多出文字)"),
+    "【主檔後文】" + expContextR,
+    "【貼上前文】" + actContextL,
+    "【貼上差異】" + (actDiff || "(無，可能為缺少文字)"),
+    "【貼上後文】" + actContextR
+  ].join("\n");
 }
-function loadCachedMaster(){
-  try{
-    const raw = localStorage.getItem(MASTER_STORAGE_KEY);
-    if(!raw) return;
-    const parsed = JSON.parse(raw);
-    if(!Array.isArray(parsed) || !parsed.length) return;
-    masterRows = parsed;
-    populateCategories();
-    qs("excelStatus").innerText = "已載入快取";
-    renderMasterInfo();
-    setStatus(`已自動載入上次主檔，共 ${masterRows.length} 筆商品。`, "ok");
-  }catch(e){
-    console.error(e);
-  }
+function updateIngredientCount(){
+  const t = qs("ingredientText").value || "";
+  const plain = t.replace(/\s+/g,"");
+  qs("ingredientCount").innerText = `字數：${plain.length}`;
 }
-function renderMasterInfo(){
-  const infoRaw = localStorage.getItem(MASTER_INFO_KEY);
-  if(!infoRaw){
-    qs("excelInfo").innerText = "";
-    return;
-  }
-  try{
-    const info = JSON.parse(infoRaw);
-    qs("excelInfo").innerText = `主檔：${info.fileName || "未命名"}｜保存時間：${info.savedAt || "-"}｜筆數：${info.count || 0}`;
-  }catch(e){
-    qs("excelInfo").innerText = "";
-  }
+function escapeHtml(s){
+  return String(s).replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
 }
-function clearMasterCache(){
-  localStorage.removeItem(MASTER_STORAGE_KEY);
-  localStorage.removeItem(MASTER_INFO_KEY);
-  masterRows = [];
-  qs("category").innerHTML = "";
-  qs("product").innerHTML = "";
-  qs("expectedSummary").innerText = "";
-  qs("excelStatus").innerText = "未載入";
-  qs("rowStatus").innerText = "未選擇";
-  qs("excelInfo").innerText = "";
-  setStatus("已清除主檔快取。", "ok");
+function ingredientDiffHtml(expected, text){
+  const exp = normalizeIngredientText(expected);
+  const act = normalizeIngredientText(text);
+  const rawAct = clean(text);
+  if(!exp) return "主檔成分空白，略過。";
+  if(!rawAct) return "貼上文字中沒有可用的成分內容。";
+  if(act === exp || act.includes(exp) || exp.includes(act)) return "成分標準化後比對一致（已忽略分段 / 換行 / 符號差異）。";
+
+  let start = 0;
+  const minLen = Math.min(exp.length, act.length);
+  while(start < minLen && exp[start] === act[start]) start++;
+
+  let endExp = exp.length - 1;
+  let endAct = act.length - 1;
+  while(endExp >= start && endAct >= start && exp[endExp] === act[endAct]){
+    endExp--;
+    endAct--;
+  }
+
+  const ctx = 30;
+  const expBefore = escapeHtml(exp.slice(Math.max(0, start - ctx), start));
+  const expDiff = escapeHtml(exp.slice(start, endExp + 1) || "(無，可能為多出文字)");
+  const expAfter = escapeHtml(exp.slice(endExp + 1, Math.min(exp.length, endExp + 1 + ctx)));
+
+  const actBefore = escapeHtml(act.slice(Math.max(0, start - ctx), start));
+  const actDiff = escapeHtml(act.slice(start, endAct + 1) || "(無，可能為缺少文字)");
+  const actAfter = escapeHtml(act.slice(endAct + 1, Math.min(act.length, endAct + 1 + ctx)));
+
+  return `
+<div class="small" style="margin-bottom:8px">已忽略：分段 / 換行 / 空白 / 常見符號差異。以下顯示真正內容差異附近。</div>
+<div><b>主檔成分</b></div>
+<div class="mono"><span class="diff-same">${expBefore}</span><span class="diff-old">${expDiff}</span><span class="diff-same">${expAfter}</span></div>
+<div style="margin-top:8px"><b>貼上成分</b></div>
+<div class="mono"><span class="diff-same">${actBefore}</span><span class="diff-new">${actDiff}</span><span class="diff-same">${actAfter}</span></div>
+<div class="small" style="margin-top:8px">紅底：主檔差異｜綠底：貼上差異</div>`;
 }
 
+
+function escapeHtml(s){
+  return String(s).replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
+}
 function populateCategories(){
   const categories = [...new Set(masterRows.map(r=>r.category))];
   qs("category").innerHTML = categories.map(c=>`<option value="${c}">${c}</option>`).join("");
@@ -277,42 +414,8 @@ function getSelectedRow(){
   const product = qs("product").value;
   return masterRows.find(r=>r.category===category && r.product===product);
 }
-function formatDate(d){
-  const y=d.getFullYear(), m=String(d.getMonth()+1).padStart(2,'0'), day=String(d.getDate()).padStart(2,'0');
-  return `${y}.${m}.${day}`;
-}
-function getDayOfYear(d){
-  const start = new Date(d.getFullYear(), 0, 1);
-  const diff = d - start;
-  return String(Math.floor(diff / 86400000) + 1).padStart(3,'0');
-}
 function getExpected(){
-  const row = getSelectedRow();
-  if(!row) return null;
-  const now = new Date();
-  const mfg = formatDate(now);
-  const isOne = qs("delivery").value === "一配";
-  const validDaysRaw = isOne ? row.oneDays : row.twoDays;
-  const validTime = isOne ? row.oneTime : row.twoTime;
-  const validDays = /^\d+$/.test(String(validDaysRaw)) ? Number(validDaysRaw) : null;
-  const exp = new Date(now);
-  if(validDays !== null) exp.setDate(exp.getDate() + validDays);
-  const expDate = validDays !== null ? formatDate(exp) : "";
-  const doy = getDayOfYear(now);
-  const deliveryCode = isOne ? "3" : "6";
-  const barcodePrefix12 = row.barcodeBase ? (String(row.barcodeBase).padStart(8,'0').slice(0,8) + doy + deliveryCode) : "";
-
-  return {
-    name: row.product,
-    price: row.price,
-    kcal: row.kcal,
-    mfgDate: mfg,
-    expDate,
-    expTime: validTime,
-    barcodeBase: row.barcodeBase,
-    barcodePrefix12,
-    nameKeywords: row.nameKeywords
-  };
+  return getSelectedRow();
 }
 function renderExpected(){
   const ex = getExpected();
@@ -323,213 +426,295 @@ function renderExpected(){
   }
   qs("rowStatus").innerText = "已選擇";
   qs("expectedSummary").innerText =
-    `品名：${ex.name}｜熱量：${ex.kcal || "X"}｜售價：${ex.price}｜製造日期：${ex.mfgDate}｜有效日期：${ex.expDate || "X"}｜有效時間：${ex.expTime || "X"}｜條碼基碼：${ex.barcodeBase || "X"}｜條碼前12碼：${ex.barcodePrefix12 || "X"}`;
+    `品名：${ex.product || "X"}｜條碼：${ex.barcodeBase || "X"}｜熱量：${ex.kcal || "X"}｜售價：${ex.price || "X"}｜一配天數：${ex.oneDays || "X"}｜一配時間：${ex.oneTime || "X"}｜二配天數：${ex.twoDays || "X"}｜二配時間：${ex.twoTime || "X"}｜微波數字：${ex.microwaveNo || "X"}｜Qrcode：${ex.qrCode || "X"}｜微波時間：${ex.microwaveTime || "X"}｜過敏原：${ex.allergen || "X"}｜成分：${ex.ingredient || "X"}｜警語：${ex.warning || "X"}`;
 }
 function setStatus(text, cls){
   const s = qs("status");
   s.className = "status " + cls;
   s.innerText = text;
 }
-
-function normalizeText(t){
-  return String(t||"")
-    .replace(/\s+/g,"")
-    .replace(/[：:]/g,"")
-    .toLowerCase();
-}
-function extractPrice(text){
-  const s = String(text||"");
-  const m = s.match(/(\d{1,3})\s*元/);
-  if(m) return m[1] + "元";
-  return "";
-}
-function extractKcal(text){
-  const s = String(text||"");
-  let m = s.match(/\d{2,4}\s*kcal/i);
-  if(m) return m[0].replace(/\s+/g,"").toLowerCase();
-
-  m = s.match(/熱量[^0-9]{0,6}(\d{2,4})/i);
-  if(m) return m[1] + "kcal";
-
-  const lines = s.split(/\n+/).map(x=>x.trim()).filter(Boolean);
-  for(const line of lines){
-    if(/元/.test(line)) continue;
-    if(/熱量|kcal/i.test(line)){
-      const d = (line.match(/\d{2,4}/) || [])[0];
-      if(d) return d + "kcal";
-    }
-  }
-
-  // fallback: choose a 2-4 digit number that is not the price
-  const nums = s.match(/\d{2,4}/g) || [];
-  if(nums.length){
-    const candidate = nums.find(n => Number(n) >= 50 && Number(n) <= 999);
-    if(candidate) return candidate + "kcal";
-  }
-  return "";
-}
-function extractDates(text){
-  return String(text||"").match(/\d{4}[.\/-]\d{2}[.\/-]\d{2}/g) || [];
-}
-function extractTime(text){
-  const m = String(text||"").match(/\d{2}時/);
-  return m ? m[0] : "";
-}
-function scoreKeywordMatch(text, keywords){
-  const normalized = normalizeText(text);
-  let hit = 0;
-  for(const k of keywords){
-    if(normalized.includes(normalizeText(k))) hit++;
-  }
-  return hit;
-}
-function escapeHtml(s){
-  return String(s).replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
-}
 function renderRows(rows){
   qs("resultBody").innerHTML = rows.map(r => `
     <tr>
       <td>${r.label}</td>
-      <td class="mono">${escapeHtml(r.actual || "(未抓到)")}</td>
+      <td class="mono">${escapeHtml(r.actual || "(未找到)")}</td>
       <td class="mono">${escapeHtml(r.expected || "-")}</td>
-      <td>${r.ok ? "✅" : "❌"}</td>
+      <td>${r.ok ? "✅" : (r.skip ? "⏭️" : "❌")}</td>
     </tr>`).join("");
 }
+
+function buildEvidenceRecord(ex, rows, lensText, ingredientText, barcodeInput, qrInput){
+  const failed = rows.filter(r=>!r.ok && !r.skip).map(r=>r.label);
+  return {
+    export_time: new Date().toLocaleString(),
+    category: ex.category || "",
+    product: ex.product || "",
+    delivery: qs("delivery").value || "",
+    barcode_input: barcodeInput || "",
+    qrcode_input: qrInput || "",
+    qrcode_input: qrInput || "",
+    pasted_text: lensText || "",
+    ingredient_pasted_text: String(ingredientText || ""),
+    result: failed.length ? ("NG：" + failed.join("、")) : "OK",
+    name_actual: getRowActual(rows, "品名(C)"),
+    name_expected: ex.product || "",
+    barcode_actual: getRowActual(rows, "條碼(D)"),
+    barcode_expected: ex.barcodeBase || "",
+    kcal_actual: getRowActual(rows, "熱量(E)"),
+    kcal_expected: ex.kcal || "",
+    price_actual: getRowActual(rows, "售價(F)"),
+    price_expected: ex.price || "",
+    one_days_actual: getRowActual(rows, "一配有效天數/橘線(G)"),
+    one_days_expected: ex.oneDays || "",
+    one_time_actual: getRowActual(rows, "一配有效時間(H)"),
+    one_time_expected: ex.oneTime || "",
+    two_days_actual: getRowActual(rows, "二配有效天數/綠線(I)"),
+    two_days_expected: ex.twoDays || "",
+    two_time_actual: getRowActual(rows, "二配有效時間(J)"),
+    two_time_expected: ex.twoTime || "",
+    microwave_no_actual: getRowActual(rows, "微波數字(K)"),
+    microwave_no_expected: ex.microwaveNo || "",
+    qrcode_actual: getRowActual(rows, "Qrcode(L)"),
+    qrcode_expected: ex.qrCode || "",
+    microwave_time_actual: getRowActual(rows, "微波時間(M)"),
+    microwave_time_expected: ex.microwaveTime || "",
+    allergen_actual: getRowActual(rows, "過敏原(N)"),
+    allergen_expected: ex.allergen || "",
+    ingredient_actual: getRowActual(rows, "成分(O)"),
+    ingredient_expected: ex.ingredient || "",
+    warning_actual: getRowActual(rows, "警語(P)"),
+    warning_expected: ex.warning || ""
+  };
+}
+function getRowActual(rows, label){
+  const row = rows.find(r => r.label === label);
+  return row ? (row.actual || "") : "";
+}
+function renderExportPreview(){
+  const el = qs("exportPreview");
+  if(!lastExportRecord){
+    el.innerText = "尚未產生可匯出結果";
+    return;
+  }
+  el.innerText = `最近一次結果：${lastExportRecord.result}｜品名：${lastExportRecord.product}｜配別：${lastExportRecord.delivery}｜匯出時間：${lastExportRecord.export_time}`;
+}
+function exportCsvEvidence(){
+  if(!lastExportRecord){
+    setStatus("請先完成一次比對，才能匯出 CSV 證據。", "warn");
+    return;
+  }
+  const headers = Object.keys(lastExportRecord);
+  const row = headers.map(h => '"' + String(lastExportRecord[h] ?? '').replace(/"/g, '""') + '"').join(",");
+  const csv = headers.join(",") + "\n" + row;
+  const blob = new Blob([csv], {type:"text/csv;charset=utf-8;"});
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  const ts = new Date();
+  const fname = `審標比對證據_${ts.getFullYear()}${String(ts.getMonth()+1).padStart(2,'0')}${String(ts.getDate()).padStart(2,'0')}_${String(ts.getHours()).padStart(2,'0')}${String(ts.getMinutes()).padStart(2,'0')}${String(ts.getSeconds()).padStart(2,'0')}.csv`;
+  a.download = fname;
+  a.click();
+  URL.revokeObjectURL(a.href);
+}
+
+function lineList(text){
+  return String(text||"").split(/\n+/).map(x=>x.trim()).filter(Boolean);
+}
+function exactMatchInText(text, expected){
+  const exp = clean(expected);
+  if(!exp || exp === "X"){
+    return {actual:"(主檔空白/略過)", ok:true, skip:true};
+  }
+  const lines = lineList(text);
+  for(const line of lines){
+    if(norm(line) === norm(exp)) return {actual:line, ok:true};
+  }
+  if(norm(text).includes(norm(exp))) return {actual:exp, ok:true};
+  return {actual:"", ok:false};
+}
+function barcodeMatch(text, barcodeInput, expected){
+  const exp = clean(expected);
+  if(!exp || exp === "X"){
+    return {actual:"(主檔空白/略過)", ok:true, skip:true};
+  }
+  const manual = String(barcodeInput||"").replace(/\D/g,"");
+  if(manual){
+    const ok = manual === exp || manual.startsWith(exp);
+    return {actual:manual, ok};
+  }
+  const nums = String(text||"").match(/\d{8,13}/g) || [];
+  for(const n of nums){
+    if(n === exp || n.startsWith(exp)) return {actual:n, ok:true};
+  }
+  return {actual:nums[0] || "", ok:false};
+}
+function normQr(v){
+  return clean(v).normalize("NFKC").replace(/\s+/g,"").toLowerCase();
+}
+function qrMatch(text, qrInput, expected){
+  const exp = clean(expected);
+  if(!exp || exp === "X"){
+    return {actual:"(主檔空白/略過)", ok:true, skip:true};
+  }
+  const manual = clean(qrInput);
+  if(manual){
+    return {actual:manual, ok:normQr(manual) === normQr(exp)};
+  }
+  const lines = lineList(text);
+  for(const line of lines){
+    if(normQr(line) === normQr(exp)) return {actual:line, ok:true};
+  }
+  if(normQr(text).includes(normQr(exp))) return {actual:exp, ok:true};
+  const urlLines = lines.filter(line => /https?:\/\/|www\.|line\.me|qr|qrcode/i.test(line));
+  for(const line of urlLines){
+    if(normQr(line) === normQr(exp)) return {actual:line, ok:true};
+  }
+  return {actual:urlLines[0] || "", ok:false};
+}
+function nearestLine(text, expected){
+  const exp = clean(expected);
+  if(!exp || exp === "X") return "(主檔空白/略過)";
+  const lines = lineList(text);
+  for(const line of lines){
+    if(line.includes(exp) || norm(line).includes(norm(exp))) return line;
+  }
+  return "";
+}
+function compareText(){
+  try{
+    const ex = getExpected();
+    if(!ex){
+      setStatus("請先載入 Excel 並選擇品名。", "warn");
+      return;
+    }
+    const barcodeInput = qs("barcodeInput").value || "";
+    const qrInput = qs("qrInput") ? (qs("qrInput").value || "") : "";
+    const lensText = qs("lensText").value || "";
+    const ingredientText = qs("ingredientText").value || "";
+    qs("ingredientDiff").innerText = "尚未比對成分";
+
+    const barcodeRes = barcodeMatch(lensText, barcodeInput, ex.barcodeBase);
+    const qrRes = qrMatch(lensText, qrInput, ex.qrCode);
+
+    const rows = [
+      {label:"品名(C)", ...exactLooseMatchInText(lensText, ex.product), expected:ex.product},
+      {label:"條碼(D)", actual:barcodeRes.actual, expected:ex.barcodeBase, ok:barcodeRes.ok, skip:barcodeRes.skip||false},
+      {label:"熱量(E)", ...exactMatchInText(lensText, ex.kcal), expected:ex.kcal},
+      {label:"售價(F)", ...exactMatchInText(lensText, ex.price), expected:ex.price},
+      {label:"一配有效天數/橘線(G)", ...exactMatchInText(lensText, ex.oneDays), expected:ex.oneDays},
+      {label:"一配有效時間(H)", ...exactMatchInText(lensText, ex.oneTime), expected:ex.oneTime},
+      {label:"二配有效天數/綠線(I)", ...exactMatchInText(lensText, ex.twoDays), expected:ex.twoDays},
+      {label:"二配有效時間(J)", ...exactMatchInText(lensText, ex.twoTime), expected:ex.twoTime},
+      {label:"微波數字(K)", ...exactMatchInText(lensText, ex.microwaveNo), expected:ex.microwaveNo},
+      {label:"Qrcode(L)", actual:qrRes.actual, expected:ex.qrCode, ok:qrRes.ok, skip:qrRes.skip||false},
+      {label:"微波時間(M)", ...exactMicrowaveMatchInText(lensText, ex.microwaveTime), expected:ex.microwaveTime},
+      {label:"過敏原(N)", ...exactLooseMatchInText(lensText, ex.allergen), expected:ex.allergen},
+      {label:"成分(O)", ...exactIngredientMatchInText(ingredientText, ex.ingredient), expected:ex.ingredient},
+      {label:"警語(P)", ...exactMatchInText(lensText, ex.warning), expected:ex.warning}
+    ];
+
+    renderRows(rows);
+
+    const ingredientRow = rows.find(r => r.label === "成分(O)");
+    if(ingredientText){
+      if(ingredientRow && ingredientRow.ok){
+        qs("ingredientDiff").innerText = "成分標準化後比對一致。";
+      }else{
+        qs("ingredientDiff").innerHTML = ingredientDiffHtml(ex.ingredient, ingredientText);
+      }
+    }else if(ingredientRow && ingredientRow.skip){
+      qs("ingredientDiff").innerText = "成分欄位略過或未比對。";
+    }else{
+      qs("ingredientDiff").innerText = "貼上文字中沒有可用的成分內容。";
+    }
+
+    qs("parseDetail").innerText =
+      `【貼上全文】
+${lensText || "(空白)"}
+
+` +
+      `【條碼輸入】 ${barcodeInput || "(空白)"}
+` +
+      `【Qrcode輸入】 ${qrInput || "(空白)"}
+` +
+      `【品名找到】 ${nearestLine(lensText, ex.product) || "(未找到)"}
+` +
+      `【品名比對模式】 忽略標點符號
+` +
+      `【熱量找到】 ${nearestLine(lensText, ex.kcal) || "(未找到)"}
+` +
+      `【售價找到】 ${nearestLine(lensText, ex.price) || "(未找到)"}
+` +
+      `【一配天數找到】 ${nearestLine(lensText, ex.oneDays) || "(未找到)"}
+` +
+      `【一配時間找到】 ${nearestLine(lensText, ex.oneTime) || "(未找到)"}
+` +
+      `【二配天數找到】 ${nearestLine(lensText, ex.twoDays) || "(未找到)"}
+` +
+      `【二配時間找到】 ${nearestLine(lensText, ex.twoTime) || "(未找到)"}
+` +
+      `【微波數字找到】 ${nearestLine(lensText, ex.microwaveNo) || "(未找到)"}
+` +
+      `【Qrcode找到】 ${qrRes.actual || nearestLine(lensText, ex.qrCode) || "(未找到)"}
+` +
+      `【微波時間找到】 ${nearestLine(lensText, ex.microwaveTime) || "(未找到)"}
+` +
+      `【過敏原找到】 ${nearestLine(lensText, ex.allergen) || "(未找到)"}
+` +
+      `【過敏原比對模式】 忽略標點符號
+` +
+      `【成分找到】 ${nearestLine(ingredientText, ex.ingredient) || "(未找到)"}
+` +
+      `【成分標準化後比對】 已啟用（忽略符號與分段差異）
+` +
+      `【警語找到】 ${nearestLine(lensText, ex.warning) || "(未找到)"}
+` +
+      `【成分獨立貼上】 ${ingredientText ? "已貼上" : "(空白)"}
+`;
+
+    lastCompareRows = rows;
+    lastExportRecord = buildEvidenceRecord(ex, rows, lensText, ingredientText, barcodeInput, qrInput);
+    renderExportPreview();
+
+    const failed = rows.filter(r=>!r.ok && !r.skip).map(r=>r.label);
+    if(failed.length){
+      setStatus("❌ NG： " + failed.join("、"), "ng");
+    }else{
+      setStatus("✅ OK", "ok");
+    }
+  }catch(err){
+    console.error(err);
+    setStatus("比對時發生錯誤，請確認 Qrcode / 條碼 / 貼上文字格式。", "ng");
+  }
+}
+
 function loadDemo(){
   const ex = getExpected();
   if(!ex){
     setStatus("請先載入 Excel 並選品名。", "warn");
     return;
   }
-  qs("barcodeInput").value = ex.barcodePrefix12 + "7";
+  qs("barcodeInput").value = ex.barcodeBase || "";
+  if(qs("qrInput")) qs("qrInput").value = ex.qrCode || "";
   qs("lensText").value =
-`${ex.name}
+`${ex.product}
 ${ex.kcal}
 ${ex.price}
-製造日期 ${ex.mfgDate}
-有效日期 ${ex.expDate} ${ex.expTime}`;
+${ex.oneDays}
+${ex.oneTime}
+${ex.twoDays}
+${ex.twoTime}
+${ex.microwaveNo}
+${ex.qrCode}
+${ex.microwaveTime}
+${ex.allergen}
+${ex.warning}`;
+  qs("ingredientText").value = ex.ingredient || "";
+  updateIngredientCount();
   setStatus("已載入示範文字，可以直接按比對。", "ok");
 }
-function compareText(){
-  const ex = getExpected();
-  if(!ex){
-    setStatus("請先載入 Excel 並選擇品名。", "warn");
-    return;
-  }
-  const barcodeInput = String(qs("barcodeInput").value || "").replace(/\D/g,"");
-  const lensText = qs("lensText").value || "";
-
-  const dates = extractDates(lensText).map(x=>x.replace(/[\/-]/g,'.'));
-  const mfgDate = dates[0] || "";
-  const expDate = dates[1] || "";
-  const timeVal = extractTime(lensText);
-  const priceVal = extractPrice(lensText);
-  const kcalVal = extractKcal(lensText);
-  const nameScore = scoreKeywordMatch(lensText, ex.nameKeywords);
-  const nameOk = nameScore >= Math.max(1, Math.ceil(ex.nameKeywords.length * 0.5));
-  const barcodeOk = barcodeInput.slice(0,12) === ex.barcodePrefix12;
-
-  const rows = [
-    {label:"品名", actual:lensText.split(/\n/).slice(0,2).join(" / "), expected:ex.name, ok:nameOk},
-    {label:"條碼", actual:barcodeInput, expected:ex.barcodePrefix12 + "X", ok:barcodeOk},
-    {label:"熱量", actual:kcalVal, expected:ex.kcal, ok:normalizeText(kcalVal) === normalizeText(ex.kcal)},
-    {label:"售價", actual:priceVal, expected:ex.price, ok:normalizeText(priceVal) === normalizeText(ex.price)},
-    {label:"製造日期", actual:mfgDate, expected:ex.mfgDate, ok:mfgDate === ex.mfgDate},
-    {label:"有效日期", actual:expDate, expected:ex.expDate, ok:expDate === ex.expDate},
-    {label:"有效時間", actual:timeVal, expected:ex.expTime, ok:normalizeText(timeVal) === normalizeText(ex.expTime)}
-  ];
-  renderRows(rows);
-
-  qs("parseDetail").innerText =
-    `【貼上全文】\n${lensText || "(空白)"}\n\n` +
-    `【價格】 ${priceVal || "(未抓到)"}\n` +
-    `【熱量】 ${kcalVal || "(未抓到)"}\n` +
-    `【日期1】 ${mfgDate || "(未抓到)"}\n` +
-    `【日期2】 ${expDate || "(未抓到)"}\n` +
-    `【時間】 ${timeVal || "(未抓到)"}\n` +
-    `【條碼前12碼】 ${barcodeInput.slice(0,12) || "(未抓到)"}\n` +
-    `【品名關鍵字命中】 ${nameScore}/${ex.nameKeywords.length}`;
-
-  const failed = rows.filter(r=>!r.ok).map(r=>r.label);
-  const resultStatus = failed.length ? ("NG：" + failed.join("、")) : "OK";
-  lastResult = {
-    time: new Date().toLocaleString(),
-    category: qs("category").value,
-    product: ex.name,
-    delivery: qs("delivery").value,
-    status: resultStatus,
-    barcode: barcodeInput,
-    kcal: kcalVal,
-    price: priceVal,
-    mfgDate: mfgDate,
-    expDate: expDate,
-    expTime: timeVal
-  };
-  if(failed.length){
-    setStatus("❌ NG： " + failed.join("、"), "ng");
-  }else{
-    setStatus("✅ OK", "ok");
-  }
-}
-
-
-function clearLensText(){
-  qs("lensText").value = "";
-  setStatus("已清除貼上文字。", "ok");
-}
-
-function getStoredResults(){
-  try{
-    return JSON.parse(localStorage.getItem(RESULT_STORAGE_KEY) || "[]");
-  }catch(e){
-    return [];
-  }
-}
-function loadHistory(){
-  const rows = getStoredResults();
-  qs("historyBody").innerHTML = rows.slice(0,20).map(r => `
-    <tr>
-      <td>${escapeHtml(r.time)}</td>
-      <td>${escapeHtml(r.product)}</td>
-      <td>${escapeHtml(r.delivery)}</td>
-      <td>${escapeHtml(r.status)}</td>
-    </tr>`).join("");
-}
-function saveResult(){
-  if(!lastResult){
-    setStatus("請先完成一次比對。", "warn");
-    return;
-  }
-  const rows = getStoredResults();
-  rows.unshift(lastResult);
-  localStorage.setItem(RESULT_STORAGE_KEY, JSON.stringify(rows));
-  loadHistory();
-  setStatus("已儲存結果到本機。", "ok");
-}
-function exportCsv(){
-  const rows = getStoredResults();
-  if(!rows.length){
-    setStatus("目前沒有可匯出的紀錄。", "warn");
-    return;
-  }
-  const headers = ["time","category","product","delivery","status","barcode","kcal","price","mfgDate","expDate","expTime"];
-  const csv = [
-    headers.join(","),
-    ...rows.map(r => headers.map(h => {
-      const val = String(r[h] ?? "").replace(/"/g,'""');
-      return `"${val}"`;
-    }).join(","))
-  ].join("\\n");
-  const blob = new Blob([csv], {type:"text/csv;charset=utf-8;"});
-  const a = document.createElement("a");
-  a.href = URL.createObjectURL(blob);
-  a.download = "label_check_results.csv";
-  a.click();
-  URL.revokeObjectURL(a.href);
-}
-
 
 init();
+
 </script>
 </body>
 </html>
