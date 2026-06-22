@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>製標審標版｜成分顯示修正版</title>
+<title>製標審標版｜過敏原獨立貼上版</title>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <style>
 body{margin:0;font-family:Arial,sans-serif;background:#0f172a;color:#fff}
@@ -52,7 +52,8 @@ th{background:#1f2937}
       13. 成分比對時，所有常見標點與符號差異都不列為失敗。<br>
       14. 成分比對時，分段 / 換行差異也不列入。<br>
       15. 新增 Qrcode 獨立判讀機制：可單獨貼上 Qrcode 掃描結果，優先以獨立輸入內容比對。<br>
-      16. 微波時間(M) 比對時，忽略 W 大小寫、空白、以及冒號全形 / 半形差異。
+      16. 微波時間(M) 比對時，忽略 W 大小寫、空白、以及冒號全形 / 半形差異。<br>
+      17. 新增過敏原獨立貼上區，過敏原可單獨貼上後進行比對。
     </div>
   </div>
 
@@ -105,7 +106,12 @@ th{background:#1f2937}
   </div>
 
   <div class="row" style="margin-top:10px">
-    <div style="grid-column:span 3;">
+    <div>
+      <label for="allergenText">過敏原獨立貼上區</label>
+      <textarea id="allergenText" placeholder="請把過敏原文字單獨貼在這裡"></textarea>
+      <div class="small" id="allergenCount">字數：0</div>
+    </div>
+    <div style="grid-column:span 2;">
       <label for="ingredientText">成分獨立貼上區</label>
       <textarea id="ingredientText" placeholder="請把成分文字單獨貼在這裡"></textarea>
       <div class="small" id="ingredientCount">字數：0</div>
@@ -166,8 +172,10 @@ function init(){
   qs("btnCompare").addEventListener("click", compareText);
   qs("btnExportCsv").addEventListener("click", exportCsvEvidence);
   qs("btnDemo").addEventListener("click", loadDemo);
-  qs("btnClearText").addEventListener("click", ()=>{ qs("lensText").value=""; qs("ingredientText").value=""; qs("qrInput").value=""; updateIngredientCount(); setStatus("已清空貼上文字、成分文字與 Qrcode。","ok"); });
+  qs("btnClearText").addEventListener("click", ()=>{ qs("lensText").value=""; qs("allergenText").value=""; qs("ingredientText").value=""; qs("qrInput").value=""; updateAllergenCount(); updateIngredientCount(); setStatus("已清空貼上文字、過敏原文字、成分文字與 Qrcode。","ok"); });
+  qs("allergenText").addEventListener("input", updateAllergenCount);
   qs("ingredientText").addEventListener("input", updateIngredientCount);
+  updateAllergenCount();
   updateIngredientCount();
   renderExportPreview();
 }
@@ -349,6 +357,12 @@ function ingredientDiffText(expected, text){
     "【貼上後文】" + actContextR
   ].join("\n");
 }
+function updateAllergenCount(){
+  const t = qs("allergenText").value || "";
+  const plain = t.replace(/\s+/g,"");
+  qs("allergenCount").innerText = `字數：${plain.length}`;
+}
+
 function updateIngredientCount(){
   const t = qs("ingredientText").value || "";
   const plain = t.replace(/\s+/g,"");
@@ -443,7 +457,7 @@ function renderRows(rows){
     </tr>`).join("");
 }
 
-function buildEvidenceRecord(ex, rows, lensText, ingredientText, barcodeInput, qrInput){
+function buildEvidenceRecord(ex, rows, lensText, allergenText, ingredientText, barcodeInput, qrInput){
   const failed = rows.filter(r=>!r.ok && !r.skip).map(r=>r.label);
   return {
     export_time: new Date().toLocaleString(),
@@ -454,6 +468,7 @@ function buildEvidenceRecord(ex, rows, lensText, ingredientText, barcodeInput, q
     qrcode_input: qrInput || "",
     qrcode_input: qrInput || "",
     pasted_text: lensText || "",
+    allergen_pasted_text: String(allergenText || ""),
     ingredient_pasted_text: String(ingredientText || ""),
     result: failed.length ? ("NG：" + failed.join("、")) : "OK",
     name_actual: getRowActual(rows, "品名(C)"),
@@ -589,6 +604,7 @@ function compareText(){
     const barcodeInput = qs("barcodeInput").value || "";
     const qrInput = qs("qrInput") ? (qs("qrInput").value || "") : "";
     const lensText = qs("lensText").value || "";
+    const allergenText = qs("allergenText").value || "";
     const ingredientText = qs("ingredientText").value || "";
     qs("ingredientDiff").innerText = "尚未比對成分";
 
@@ -607,7 +623,7 @@ function compareText(){
       {label:"微波數字(K)", ...exactMatchInText(lensText, ex.microwaveNo), expected:ex.microwaveNo},
       {label:"Qrcode(L)", actual:qrRes.actual, expected:ex.qrCode, ok:qrRes.ok, skip:qrRes.skip||false},
       {label:"微波時間(M)", ...exactMicrowaveMatchInText(lensText, ex.microwaveTime), expected:ex.microwaveTime},
-      {label:"過敏原(N)", ...exactLooseMatchInText(lensText, ex.allergen), expected:ex.allergen},
+      {label:"過敏原(N)", ...exactLooseMatchInText(allergenText || lensText, ex.allergen), expected:ex.allergen},
       {label:"成分(O)", ...exactIngredientMatchInText(ingredientText, ex.ingredient), expected:ex.ingredient},
       {label:"警語(P)", ...exactMatchInText(lensText, ex.warning), expected:ex.warning}
     ];
@@ -658,7 +674,9 @@ ${lensText || "(空白)"}
 ` +
       `【微波時間找到】 ${nearestLine(lensText, ex.microwaveTime) || "(未找到)"}
 ` +
-      `【過敏原找到】 ${nearestLine(lensText, ex.allergen) || "(未找到)"}
+      `【過敏原找到】 ${nearestLine(allergenText || lensText, ex.allergen) || "(未找到)"}
+` +
+      `【過敏原獨立貼上】 ${allergenText ? "已貼上" : "(空白，改用全文區比對)"}
 ` +
       `【過敏原比對模式】 忽略標點符號
 ` +
@@ -672,7 +690,7 @@ ${lensText || "(空白)"}
 `;
 
     lastCompareRows = rows;
-    lastExportRecord = buildEvidenceRecord(ex, rows, lensText, ingredientText, barcodeInput, qrInput);
+    lastExportRecord = buildEvidenceRecord(ex, rows, lensText, allergenText, ingredientText, barcodeInput, qrInput);
     renderExportPreview();
 
     const failed = rows.filter(r=>!r.ok && !r.skip).map(r=>r.label);
@@ -708,7 +726,9 @@ ${ex.qrCode}
 ${ex.microwaveTime}
 ${ex.allergen}
 ${ex.warning}`;
+  qs("allergenText").value = ex.allergen || "";
   qs("ingredientText").value = ex.ingredient || "";
+  updateAllergenCount();
   updateIngredientCount();
   setStatus("已載入示範文字，可以直接按比對。", "ok");
 }
